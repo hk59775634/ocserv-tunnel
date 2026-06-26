@@ -1,0 +1,63 @@
+/*
+ * SPEC-01 reference snippet — Cisco TunnelGroupName in RADIUS Access-Request
+ *
+ * Integrate into src/auth/radius.c (ocserv 1.2.x) if unified patch does not apply.
+ * Requires dictionary.vpnplatform (PW_TUNNELGROUPNAME / VSA 146) in radcli dictionary.
+ */
+
+/* --- radius.h: add to struct radius_ctx_st --- */
+/*
+	char selected_group[MAX_GROUPNAME_SIZE];
+*/
+
+/* --- radius_auth_init(): after user_agent copy --- */
+/*
+	pctx->selected_group[0] = 0;
+	// TODO: when common_auth_init_st gains groupname:
+	// if (info->groupname && info->groupname[0])
+	//     strlcpy(pctx->selected_group, info->groupname, sizeof(pctx->selected_group));
+*/
+
+/* --- sec-mod-auth.c: before module->auth_pass(), optional helper --- */
+/*
+	if (e->acct_info.groupname[0] != 0 && e->module->type == AUTH_TYPE_RADIUS) {
+		// Call new export: radius_auth_set_selected_group(e->auth_ctx, e->acct_info.groupname);
+	}
+*/
+
+/* --- radius_auth_pass(): immediately before rc_aaa() --- */
+static int vpnplatform_add_tunnel_group_name(struct radius_ctx_st *pctx, VALUE_PAIR **send)
+{
+	if (pctx->selected_group[0] == 0)
+		return 0;
+
+	/* Direct VSA 146 (preferred; matches FreeRADIUS dictionary.cisco.asa) */
+	if (rc_avpair_add(pctx->vctx->rh, send, PW_TUNNELGROUPNAME,
+			  pctx->selected_group, -1, 0) == NULL) {
+		syslog(LOG_ERR,
+		       "radius-auth: failed TunnelGroupName VSA for user '%s' group '%s'",
+		       pctx->username, pctx->selected_group);
+		return -1;
+	}
+
+	/* Alternative: Cisco-AVPair vendor-type 1 (uncomment if FR expects AVPair only)
+	char avpair[128];
+	snprintf(avpair, sizeof(avpair), "tunnel-group=%s", pctx->selected_group);
+	if (rc_avpair_add(pctx->vctx->rh, send, PW_CISCO_AVPAIR, avpair, -1, 0) == NULL)
+		return -1;
+	*/
+
+	syslog(LOG_DEBUG, "radius-auth: TunnelGroupName='%s' user='%s'",
+	       pctx->selected_group, pctx->username);
+	return 0;
+}
+
+/*
+ * Wire authgroup source (research summary):
+ *
+ * - select-group-by-url sets worker-side group → sec-mod AuthInitReq.group_name
+ * - sec-mod stores e->req_group_name, then set_auth_group() → e->acct_info.groupname
+ * - radius_auth_pass() runs AFTER group resolution but radius ctx is NOT updated today
+ *
+ * Minimum fix: copy e->acct_info.groupname into pctx->selected_group before auth_pass.
+ */

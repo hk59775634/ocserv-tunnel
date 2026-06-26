@@ -1,0 +1,23 @@
+# Build artifacts
+pop-api/ocserv-pop-api
+*.exe
+
+# Go
+pop-api/vendor/
+
+# ocserv source build
+/tmp/
+*.o
+*.a
+
+# Secrets
+*.env
+pop-api.env
+
+# Gate POC runtime
+gate-poc/docs/REPORT.md.bak
+/etc/ocserv/*.gate-poc.*
+
+# OS
+.DS_Store
+Thumbs.db

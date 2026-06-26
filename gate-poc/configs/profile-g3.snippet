@@ -1,0 +1,6 @@
+# Profile G3 — groupconfig=true（与 config-per-group 互斥）
+select-group-by-url = true
+select-group = demo_agent
+select-group = ilinkcn
+select-group = g3test
+auth = "radius[config=/etc/radcli/radiusclient.conf,groupconfig=true,nas-identifier=pop-default]"

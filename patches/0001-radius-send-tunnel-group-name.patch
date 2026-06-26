@@ -1,0 +1,74 @@
+From: vpn-platform <dev@vpn-platform.local>
+Subject: [PATCH 1/1] auth/radius: send Cisco TunnelGroupName on Access-Request
+
+Route B SPEC-01: propagate URL-selected authgroup to RADIUS as Cisco
+VSA 146 (TunnelGroupName) so FreeRADIUS can resolve tenant without
+user@agent suffix.
+
+Baseline: ocserv 1.2.x (context lines from upstream master; rebase if needed).
+
+TODO for implementer: wire selected authgroup from sec-mod into radius
+ctx — common_auth_init_st has no groupname today; see patches/README.md.
+
+---
+ src/auth/radius.c | 24 ++++++++++++++++++++++++
+ src/auth/radius.h |  1 +
+ 2 files changed, 25 insertions(+)
+
+diff --git a/src/auth/radius.h b/src/auth/radius.h
+index 0000000..0000001 100644
+--- a/src/auth/radius.h
++++ b/src/auth/radius.h
+@@ -44,6 +44,7 @@ struct radius_ctx_st {
+ 	char username[MAX_USERNAME_SIZE*2];
+ 	char user_agent[MAX_AGENT_NAME];
+ 
++	char selected_group[MAX_GROUPNAME_SIZE]; /* URL authgroup (SPEC-01) */
+ 	char *groupnames[MAX_GROUPS];
+ 	unsigned groupnames_size;
+ 
+diff --git a/src/auth/radius.c b/src/auth/radius.c
+index 0000000..0000001 100644
+--- a/src/auth/radius.c
++++ b/src/auth/radius.c
+@@ -136,6 +136,12 @@ static int radius_auth_init(void **ctx, void *pool, void *_vctx, const common_a
+ 	if (info->user_agent)
+ 		strlcpy(pctx->user_agent, info->user_agent, sizeof(pctx->user_agent));
+ 
++	/* TODO(SPEC-01): populate from sec-mod URL group selection.
++	 * Option A: extend common_auth_init_st with groupname and copy here.
++	 * Option B: radius_auth_set_group() hook from set_auth_group() path.
++	 * Until wired, selected_group remains empty and VSA 146 is omitted. */
++	pctx->selected_group[0] = 0;
++
+ 	*ctx = pctx;
+ 
+ 	return ERR_AUTH_CONTINUE;
+@@ -348,6 +354,24 @@ static int radius_auth_pass(void *ctx, const char *pass, unsigned pass_len)
+ 		pctx->state = NULL;
+ 	}
+ 
++	/* SPEC-01: Cisco ASA TunnelGroupName (VSA 146) = URL-selected authgroup */
++	if (pctx->selected_group[0] != 0) {
++		if (rc_avpair_add(pctx->vctx->rh, &send, PW_TUNNELGROUPNAME,
++				  pctx->selected_group, -1, 0) == NULL) {
++			syslog(LOG_ERR,
++			       "%s:%u: error adding TunnelGroupName VSA for user '%s' group '%s'",
++			       __func__, __LINE__, pctx->username, pctx->selected_group);
++			ret = ERR_AUTH_FAIL;
++			goto cleanup;
++		}
++		syslog(LOG_DEBUG,
++		       "radius-auth: sending TunnelGroupName='%s' for user '%s'",
++		       pctx->selected_group, pctx->username);
++	} else {
++		syslog(LOG_DEBUG,
++		       "radius-auth: no selected_group; TunnelGroupName omitted for user '%s'",
++		       pctx->username);
++	}
++
+ 	pctx->pass_msg[0] = 0;
+ 	ret = rc_aaa(pctx->vctx->rh, 0, send, &recvd, pctx->pass_msg, 0, PW_ACCESS_REQUEST);
+ 
+-- 
+2.43.0
