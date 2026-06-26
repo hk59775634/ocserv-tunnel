@@ -1,37 +1,37 @@
 /*
- * SPEC-01 reference snippet — Cisco TunnelGroupName in RADIUS Access-Request
+ * SPEC-01 参考片段 — 在 RADIUS Access-Request 中发送 Cisco TunnelGroupName
  *
- * Integrate into src/auth/radius.c (ocserv 1.2.x) if unified patch does not apply.
- * Requires dictionary.vpnplatform (PW_TUNNELGROUPNAME / VSA 146) in radcli dictionary.
+ * 若统一补丁无法应用，可合并到 src/auth/radius.c（ocserv 1.2.x / 1.4.x）。
+ * 要求 radcli 字典已包含 dictionary.vpnplatform（PW_TUNNELGROUPNAME / VSA 146）。
  */
 
-/* --- radius.h: add to struct radius_ctx_st --- */
+/* --- radius.h：在 struct radius_ctx_st 中增加 --- */
 /*
 	char selected_group[MAX_GROUPNAME_SIZE];
 */
 
-/* --- radius_auth_init(): after user_agent copy --- */
+/* --- radius_auth_init()：复制 user_agent 之后 --- */
 /*
 	pctx->selected_group[0] = 0;
-	// TODO: when common_auth_init_st gains groupname:
+	// TODO：common_auth_init_st 增加 groupname 后：
 	// if (info->groupname && info->groupname[0])
 	//     strlcpy(pctx->selected_group, info->groupname, sizeof(pctx->selected_group));
 */
 
-/* --- sec-mod-auth.c: before module->auth_pass(), optional helper --- */
+/* --- sec-mod-auth.c：module->auth_pass() 之前（可选辅助） --- */
 /*
 	if (e->acct_info.groupname[0] != 0 && e->module->type == AUTH_TYPE_RADIUS) {
-		// Call new export: radius_auth_set_selected_group(e->auth_ctx, e->acct_info.groupname);
+		// 调用新导出：radius_auth_set_selected_group(e->auth_ctx, e->acct_info.groupname);
 	}
 */
 
-/* --- radius_auth_pass(): immediately before rc_aaa() --- */
+/* --- radius_auth_pass()：紧接 rc_aaa() 之前 --- */
 static int vpnplatform_add_tunnel_group_name(struct radius_ctx_st *pctx, VALUE_PAIR **send)
 {
 	if (pctx->selected_group[0] == 0)
 		return 0;
 
-	/* Direct VSA 146 (preferred; matches FreeRADIUS dictionary.cisco.asa) */
+	/* 直接 VSA 146（推荐；与 FreeRADIUS dictionary.cisco.asa 一致） */
 	if (rc_avpair_add(pctx->vctx->rh, send, PW_TUNNELGROUPNAME,
 			  pctx->selected_group, -1, 0) == NULL) {
 		syslog(LOG_ERR,
@@ -40,7 +40,7 @@ static int vpnplatform_add_tunnel_group_name(struct radius_ctx_st *pctx, VALUE_P
 		return -1;
 	}
 
-	/* Alternative: Cisco-AVPair vendor-type 1 (uncomment if FR expects AVPair only)
+	/* 备选：Cisco-AVPair vendor-type 1（若 FreeRADIUS 仅认 AVPair 时取消注释）
 	char avpair[128];
 	snprintf(avpair, sizeof(avpair), "tunnel-group=%s", pctx->selected_group);
 	if (rc_avpair_add(pctx->vctx->rh, send, PW_CISCO_AVPAIR, avpair, -1, 0) == NULL)
@@ -53,11 +53,11 @@ static int vpnplatform_add_tunnel_group_name(struct radius_ctx_st *pctx, VALUE_P
 }
 
 /*
- * Wire authgroup source (research summary):
+ * authgroup 来源（调研摘要）：
  *
- * - select-group-by-url sets worker-side group → sec-mod AuthInitReq.group_name
- * - sec-mod stores e->req_group_name, then set_auth_group() → e->acct_info.groupname
- * - radius_auth_pass() runs AFTER group resolution but radius ctx is NOT updated today
+ * - select-group-by-url 在 worker 侧选组 → sec-mod AuthInitReq.group_name
+ * - sec-mod 写入 e->req_group_name，再 set_auth_group() → e->acct_info.groupname
+ * - radius_auth_pass() 在组解析之后执行，但 radius ctx 今日未同步组名
  *
- * Minimum fix: copy e->acct_info.groupname into pctx->selected_group before auth_pass.
+ * 最小修复：在 auth_pass 前将 req->group_name 写入 pctx->selected_group。
  */

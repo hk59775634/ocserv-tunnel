@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# G3 — groupconfig=true, verify ≥2 RADIUS attribute types take effect
+# G3 — groupconfig=true，验证 RADIUS 回包至少 2 类属性生效
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -15,14 +15,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-log "=== ${GATE}: groupconfig=true + RADIUS attributes ==="
+log "=== ${GATE}: groupconfig=true + RADIUS 属性 ==="
 
 save_conf
 apply_profile g3
-grep -q 'groupconfig=true' "$OCSERV_CONF" || fail "groupconfig not set"
-grep -qE '^config-per-group' "$OCSERV_CONF" && fail "config-per-group must be absent for G3"
+grep -q 'groupconfig=true' "$OCSERV_CONF" || fail "未设置 groupconfig=true"
+grep -qE '^config-per-group' "$OCSERV_CONF" && fail "G3 配置中不得包含 config-per-group"
 
-# Platform RADIUS returns Filter-Id + Session-Timeout for testuser
 api_out=$(curl -sf -X POST "http://127.0.0.1:8080/api/radius/auth" \
   -H "Content-Type: application/json" \
   -H "X-Device-Secret: demo_radius_secret_2026" \
@@ -44,19 +43,19 @@ EOF' 2>&1 || true)
   echo "$fr_out" | grep -q 'Access-Accept' || true
 fi
 
-[[ "$attrs" -ge 2 ]] || fail "need ≥2 attribute types in RADIUS Accept (got ${attrs})"
-info "RADIUS Accept attrs matched: ${attrs}"
+[[ "$attrs" -ge 2 ]] || fail "RADIUS Accept 需至少 2 类属性（当前 ${attrs}）"
+info "RADIUS Accept 匹配属性数: ${attrs}"
 
 if command -v openconnect >/dev/null 2>&1; then
   if openconnect_probe "https://${POP_HOST}/demo_agent" 45; then
-    note="groupconfig profile; RADIUS ≥2 attrs; OpenConnect auth OK"
+    note="groupconfig profile；RADIUS ≥2 属性；OpenConnect 认证成功"
     pass "$note"
   else
-    note="groupconfig profile; RADIUS Accept has Filter-Id+Session-Timeout (VPN auth pending G4 patch)"
+    note="groupconfig profile；RADIUS 含 Filter-Id+Session-Timeout（VPN Accept 待 G4 补丁）"
     pass "$note"
   fi
 else
-  note="RADIUS Accept ≥2 attrs; OpenConnect skipped"
+  note="RADIUS Accept ≥2 属性；未安装 OpenConnect，跳过 VPN 探针"
   pass "$note"
 fi
 

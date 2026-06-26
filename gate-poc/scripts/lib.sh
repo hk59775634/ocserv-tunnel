@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared helpers for ocserv-gate-poc
+# ocserv-gate-poc 公共函数
 set -euo pipefail
 
 GATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -18,15 +18,15 @@ VPN_PASS="${VPN_PASS:-User@123}"
 CERT_PIN="${CERT_PIN:-pin-sha256:+hKBZZFU9ou9kc01OAYtUQQPpjeB9kkaQp3X3mhDzpE=}"
 CONF_SNAPSHOT="/tmp/ocserv-gate-poc.snapshot"
 
-RESULT_PASS="PASS"
-RESULT_FAIL="FAIL"
-RESULT_SKIP="SKIP"
-RESULT_INFO="INFO"
+RESULT_PASS="通过"
+RESULT_FAIL="未通过"
+RESULT_SKIP="跳过"
+RESULT_INFO="信息"
 
 log() { echo "[$(date -Iseconds)] $*"; }
-pass() { log "PASS: $*"; }
-fail() { log "FAIL: $*"; return 1; }
-info() { log "INFO: $*"; }
+pass() { log "通过: $*"; }
+fail() { log "未通过: $*"; return 1; }
+info() { log "信息: $*"; }
 
 ocserv_pid() {
   if [[ -f "$OCSERV_PID_FILE" ]]; then
@@ -53,8 +53,8 @@ write_conf_with_profile() {
   local profile=$1
   local snippet="${GATE_ROOT}/configs/profile-${profile}.snippet"
   local base="${GATE_ROOT}/configs/ocserv-base.conf"
-  [[ -f "$snippet" ]] || fail "missing ${snippet}"
-  [[ -f "$base" ]] || fail "missing ${base}"
+  [[ -f "$snippet" ]] || fail "缺少配置片段 ${snippet}"
+  [[ -f "$base" ]] || fail "缺少基础配置 ${base}"
   cat "$base" > "$OCSERV_CONF"
   echo "" >> "$OCSERV_CONF"
   echo "# Profile ${profile} — ocserv-gate-poc" >> "$OCSERV_CONF"
@@ -74,11 +74,11 @@ restore_conf() {
 
 restart_ocserv() {
   if ! ocserv -t -c "$OCSERV_CONF" >/dev/null 2>&1; then
-    ocserv --test-config -c "$OCSERV_CONF" >/dev/null 2>&1 || fail "invalid ocserv.conf"
+    ocserv --test-config -c "$OCSERV_CONF" >/dev/null 2>&1 || fail "ocserv.conf 无效"
   fi
   systemctl restart ocserv
   sleep 3
-  ocserv_active || fail "ocserv not active"
+  ocserv_active || fail "ocserv 未运行"
 }
 
 apply_profile() {

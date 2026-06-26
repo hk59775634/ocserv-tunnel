@@ -1,6 +1,6 @@
 # ocserv 门禁需求 — G1～G6
 
-> 子项目 `ocserv-gate-poc` 验收标准。通过定义见各脚本 exit code 与 `docs/REPORT.md`。
+> 子项目 `gate-poc` 验收标准。通过定义见各脚本 exit code 与 `docs/REPORT.md`。
 
 ## G1 — select-group-by-url + 单域名
 
@@ -101,6 +101,6 @@
 
 ## P1 启动条件（引用主清单）
 
-1. G1、G2、G3、G5 = PASS
+1. G1、G2、G3、G5 = 通过
 2. G6 已选定 P1 或 P2
 3. G4 无「不可实现」结论

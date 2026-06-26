@@ -67,7 +67,7 @@ if (info->groupname)
 rc_avpair_add(..., PW_TUNNELGROUPNAME, pctx->selected_group, ...);
 ```
 
-参考脚手架：`services/ocserv-vpnplatform/patches/0001-radius-send-tunnel-group-name.patch`（需按 1.4.2 路径 rebase，`auth/radius.c` 已内建）。
+参考脚手架：`patches/0001-radius-send-tunnel-group-name.patch`（需按 1.4.2 路径 rebase，`auth/radius.c` 已内建）。
 
 ### 3.3 验收
 

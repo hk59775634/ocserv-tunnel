@@ -1,5 +1,5 @@
 [Unit]
-Description=ocserv POP management API (Route B P2 sidecar)
+Description=ocserv POP 管理 API（Route B P2 侧车）
 Documentation=file:///etc/ocserv/README-vpnplatform
 After=network.target ocserv.service
 Wants=ocserv.service

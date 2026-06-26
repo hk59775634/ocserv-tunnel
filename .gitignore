@@ -1,23 +1,23 @@
-# Build artifacts
+# 构建产物
 pop-api/ocserv-pop-api
 *.exe
 
 # Go
 pop-api/vendor/
 
-# ocserv source build
+# ocserv 源码编译临时目录
 /tmp/
 *.o
 *.a
 
-# Secrets
+# 密钥（勿提交）
 *.env
 pop-api.env
 
-# Gate POC runtime
+# 门禁 POC 运行时
 gate-poc/docs/REPORT.md.bak
 /etc/ocserv/*.gate-poc.*
 
-# OS
+# 系统文件
 .DS_Store
 Thumbs.db

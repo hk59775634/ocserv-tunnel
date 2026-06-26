@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run all ocserv gate POC tests (G1–G6) and generate REPORT.md
+# 运行全部 ocserv 门禁测试（G1–G6）并生成 REPORT.md
 set -euo pipefail
 
 GATE_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -9,7 +9,7 @@ SCRIPT_DIR="${GATE_ROOT}/scripts"
 REPORT="${GATE_ROOT}/docs/REPORT.md"
 mkdir -p "${GATE_ROOT}/docs"
 
-OCSERV_VER=$(ocserv --version 2>&1 | head -1 || echo "unknown")
+OCSERV_VER=$(ocserv --version 2>&1 | head -1 || echo "未知")
 HOST=$(hostname -f 2>/dev/null || hostname)
 
 cat > "$REPORT" << EOF
@@ -18,7 +18,7 @@ cat > "$REPORT" << EOF
 - **日期**：$(date -Iseconds)
 - **主机**：${HOST} (${POP_HOST})
 - **ocserv 版本**：${OCSERV_VER}
-- **子项目**：\`services/ocserv-gate-poc\`
+- **子项目**：\`gate-poc/\`
 
 ## 门禁结果
 
@@ -28,30 +28,30 @@ EOF
 
 overall=0
 
-# Snapshot production config (G12 profile = current prod layout)
+# 快照当前生产配置（G12 profile）
 save_conf
 write_conf_with_profile g12
 restart_ocserv
 
 run_gate() {
   local name=$1 script=$2
-  log ">>> Running ${name}"
+  log ">>> 开始 ${name}"
   if bash "$script"; then
-    info "${name} completed"
+    info "${name} 完成"
   else
     overall=1
-    record_result "$name" "$RESULT_FAIL" "see script output"
-    log ">>> ${name} FAILED"
+    record_result "$name" "$RESULT_FAIL" "见脚本输出"
+    log ">>> ${name} 未通过"
   fi
 }
 
-# G4/G6 are static docs — record from files
+# G4/G6 为静态文档
 record_g_static() {
   local gate=$1 file=$2
   if [[ -f "$file" ]]; then
-    record_result "$gate" "$RESULT_PASS" "documented in $(basename "$file")"
+    record_result "$gate" "$RESULT_PASS" "见 $(basename "$file")"
   else
-    record_result "$gate" "$RESULT_FAIL" "missing $(basename "$file")"
+    record_result "$gate" "$RESULT_FAIL" "缺少 $(basename "$file")"
     overall=1
   fi
 }
@@ -69,7 +69,7 @@ restore_conf || true
   echo ""
   echo "## 总体结论"
   if [[ "$overall" -eq 0 ]]; then
-    echo "- [x] **进入 P1**（ocserv-vpnplatform Fork + TunnelGroupName 补丁）"
+    echo "- [x] **进入 P1**（ocserv Fork + TunnelGroupName 补丁）"
   else
     echo "- [ ] 部分门禁未通过，见上表"
   fi
@@ -79,5 +79,5 @@ restore_conf || true
   echo "- G6: [G6-pop-api-decision.md](./G6-pop-api-decision.md)"
 } >> "$REPORT"
 
-log "Report written: ${REPORT}"
+log "报告已写入: ${REPORT}"
 exit "$overall"

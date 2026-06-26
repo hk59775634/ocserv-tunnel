@@ -1,4 +1,4 @@
-# ocserv-gate-poc
+# ocserv 门禁 POC
 
 **独立子项目**：Route B 数据面门禁 G1–G6 验证与交付。
 
@@ -38,7 +38,7 @@ bash gate-poc/scripts/run-all.sh
 ## 目录
 
 ```
-ocserv-gate-poc/
+gate-poc/
 ├── README.md
 ├── REQUIREMENTS.md
 ├── configs/

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Build ocserv from source (select-group-by-url requires >= 1.3.0; Ubuntu apt is 1.2.4)
+# 从源码编译 ocserv（select-group-by-url 需 >= 1.3.0；Ubuntu apt 为 1.2.4）
 set -euo pipefail
 
 OCSERV_VERSION="${OCSERV_VERSION:-1.4.2}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-echo "==> Build ocserv ${OCSERV_VERSION} from source"
+echo "==> 从源码编译 ocserv ${OCSERV_VERSION}"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
@@ -26,8 +26,8 @@ git clone --depth 1 --branch "${OCSERV_VERSION}" https://gitlab.com/openconnect/
 cd ocserv
 if compgen -G "${ROOT_DIR}/patches/*.patch" > /dev/null; then
   for p in "${ROOT_DIR}"/patches/*.patch; do
-    echo "    patch: $(basename "$p")"
-    patch -p1 -N < "$p" || echo "WARN: patch $(basename "$p") failed"
+    echo "    补丁: $(basename "$p")"
+    patch -p1 -N < "$p" || echo "警告: 补丁 $(basename "$p") 应用失败"
   done
 fi
 
@@ -36,4 +36,4 @@ ninja -C build
 ninja -C build install
 ldconfig
 
-echo "==> Installed: $(ocserv --version 2>&1 | head -1)"
+echo "==> 已安装: $(ocserv --version 2>&1 | head -1)"

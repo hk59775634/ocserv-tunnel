@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# G5 — same private key, replace cert + SIGHUP, process survives
+# G5 — 同私钥换证 + SIGHUP，进程不退出
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 
@@ -7,14 +7,13 @@ GATE="G5"
 note=""
 CERT_BACKUP="/tmp/ocserv-gate-g5-cert.bak"
 
-log "=== ${GATE}: cert reload same private key ==="
-ocserv_active || fail "ocserv not running"
+log "=== ${GATE}: 同私钥证书热更新 ==="
+ocserv_active || fail "ocserv 未运行"
 
 pid_before=$(ocserv_pid)
 fp_before=$(cert_fingerprint "$OCSERV_CERT")
 cp -a "$OCSERV_CERT" "$CERT_BACKUP"
 
-# Re-issue cert with same key, different validity (new serial)
 cat > /tmp/g5-cert.tmpl << 'TMPL'
 cn = "vpn-pop-g5-reload"
 organization = "VPN Platform G5"
@@ -30,23 +29,22 @@ certtool --generate-self-signed \
   --outfile "$OCSERV_CERT"
 
 fp_after=$(cert_fingerprint "$OCSERV_CERT")
-[[ "$fp_before" != "$fp_after" ]] || fail "fingerprint unchanged after reissue"
+[[ "$fp_before" != "$fp_after" ]] || fail "换证后证书指纹未变化"
 
 pop_api POST /api/v1/reload >/dev/null
 sleep 2
 
 pid_after=$(ocserv_pid)
-ocserv_active || fail "ocserv crashed after cert reload"
+ocserv_active || fail "证书热更新后 ocserv 崩溃"
 
 if [[ "$pid_before" != "$pid_after" ]]; then
-  note="PID changed after SIGHUP — possible restart"
+  note="SIGHUP 后 PID 变化，可能发生 restart"
   fail "$note"
 fi
 
-note="SIGHUP OK pid=${pid_after}; cert ${fp_before}→${fp_after}"
+note="SIGHUP 成功 pid=${pid_after}；证书指纹 ${fp_before}→${fp_after}"
 pass "$note"
 record_result "$GATE" "$RESULT_PASS" "$note"
 
-# restore original cert for production
 cp -a "$CERT_BACKUP" "$OCSERV_CERT"
 pop_api POST /api/v1/reload >/dev/null 2>&1 || true

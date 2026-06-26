@@ -1,5 +1,5 @@
-// Package main implements the P2 sidecar POP management API for ocserv Route B.
-// Same HTTP contract as embedded P1 API (see docs/ocserv-route-b-开发需求说明.md §5.3).
+// Package main 实现 ocserv Route B 的 P2 侧车 POP 管理 API。
+// HTTP 契约与内嵌 P1 API 一致（见平台开发需求 §5.3）。
 package main
 
 import (
@@ -57,7 +57,7 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	log.Printf("ocserv-pop-api listening on %s (P2 sidecar)", listenAddr)
+	log.Printf("ocserv-pop-api 监听 %s（P2 侧车）", listenAddr)
 	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("server: %v", err)
 	}
@@ -66,7 +66,7 @@ func main() {
 func loadConfig() (*config, error) {
 	apiKey := os.Getenv("OCSERV_API_KEY")
 	if apiKey == "" {
-		return nil, errors.New("OCSERV_API_KEY is required")
+		return nil, errors.New("必须设置环境变量 OCSERV_API_KEY")
 	}
 
 	configDir := envOr("OCSERV_CONFIG_DIR", "/etc/ocserv")
@@ -96,7 +96,7 @@ func envOr(key, fallback string) string {
 func (c *config) authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("X-API-Key") != c.apiKey {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid or missing X-API-Key"})
+			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "X-API-Key 无效或缺失"})
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -133,7 +133,7 @@ func (c *config) handleReload(w http.ResponseWriter, r *http.Request) {
 func (c *config) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	var req groupCreateRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		writeError(w, http.StatusBadRequest, fmt.Errorf("JSON 无效: %w", err))
 		return
 	}
 	name, err := sanitizeGroupName(req.Name)
@@ -148,7 +148,7 @@ func (c *config) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := filepath.Join(c.groupDir, name)
-	content := fmt.Sprintf("# config-per-group/%s — managed by ocserv-pop-api\n# Add group-specific routes/QoS markers here\n", name)
+	content := fmt.Sprintf("# config-per-group/%s — 由 ocserv-pop-api 管理\n# 可在此添加组级路由/QoS 标记\n", name)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -158,7 +158,7 @@ func (c *config) handleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusCreated, map[string]any{
 			"name":    name,
 			"path":    path,
-			"warning": "group file created but ocserv reload failed: " + err.Error(),
+			"warning": "组文件已创建，但 ocserv 热加载失败: " + err.Error(),
 		})
 		return
 	}
@@ -182,7 +182,7 @@ func (c *config) handleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	if err := c.sighupOcserv(); err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{
 			"deleted": name,
-			"warning": "group removed but ocserv reload failed: " + err.Error(),
+			"warning": "组已删除，但 ocserv 热加载失败: " + err.Error(),
 		})
 		return
 	}
@@ -197,15 +197,15 @@ func (c *config) handleDisconnectAll(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO(P2): enumerate sessions by group via occtl JSON/socket and disconnect each.
-	// Stub: attempt occtl disconnect user for known pattern; production needs session listing.
+	// TODO(P2)：通过 occtl JSON/socket 按组枚举会话并逐个断开。
+	// 占位：尝试 occtl disconnect；生产环境需会话列表能力。
 	cmd := exec.Command("occtl", "disconnect", "user", "--group", name)
 	out, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
 		writeJSON(w, http.StatusAccepted, map[string]any{
 			"group":   name,
 			"status":  "stub",
-			"message": "occtl group disconnect not fully implemented; verify occtl version supports --group",
+			"message": "occtl 按组踢线尚未完整实现，请确认 occtl 版本支持 --group",
 			"detail":  strings.TrimSpace(string(out)),
 			"error":   cmdErr.Error(),
 		})
@@ -228,11 +228,11 @@ func (c *config) handleCertificate(w http.ResponseWriter, r *http.Request) {
 
 	var req certificateRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid JSON: %w", err))
+		writeError(w, http.StatusBadRequest, fmt.Errorf("JSON 无效: %w", err))
 		return
 	}
 	if req.Certificate == "" || req.PrivateKey == "" {
-		writeError(w, http.StatusBadRequest, errors.New("certificate and private_key are required"))
+		writeError(w, http.StatusBadRequest, errors.New("certificate 与 private_key 均为必填"))
 		return
 	}
 
@@ -253,7 +253,7 @@ func (c *config) handleCertificate(w http.ResponseWriter, r *http.Request) {
 			"status":      "certificate_updated",
 			"certificate": certPath,
 			"private_key": keyPath,
-			"warning":     "certificate written but ocserv reload failed: " + err.Error(),
+			"warning":     "证书已写入，但 ocserv 热加载失败: " + err.Error(),
 		})
 		return
 	}
@@ -307,7 +307,7 @@ func (c *config) readPID() (int, bool) {
 func (c *config) sighupOcserv() error {
 	pid, running := c.readPID()
 	if !running {
-		return fmt.Errorf("ocserv not running (pid file %s)", c.pidFile)
+		return fmt.Errorf("ocserv 未运行（pid 文件 %s）", c.pidFile)
 	}
 	proc, err := os.FindProcess(pid)
 	if err != nil {
@@ -319,16 +319,16 @@ func (c *config) sighupOcserv() error {
 func sanitizeGroupName(name string) (string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", errors.New("group name is required")
+		return "", errors.New("组名不能为空")
 	}
 	if strings.Contains(name, "/") || strings.Contains(name, "..") {
-		return "", errors.New("invalid group name")
+		return "", errors.New("组名无效")
 	}
 	for _, r := range name {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
 			continue
 		}
-		return "", fmt.Errorf("invalid character in group name: %q", r)
+		return "", fmt.Errorf("组名含非法字符: %q", r)
 	}
 	return name, nil
 }
