@@ -1,12 +1,8 @@
-# radcli 字典扩展 — VPN 平台 Route B
-# 合并到 radcli 字典路径（见 radiusclient.conf 的 dictionary 指令）
-# 与 FreeRADIUS dictionary.cisco.asa VSA 146 对齐
+# radcli dictionary extension for VPN platform Route B
+# Aligns with FreeRADIUS dictionary.cisco.asa (vendor 3076, VSA 146)
 
-VENDOR          Cisco           9
+VENDOR          Cisco-ASA       3076
 
-BEGIN-VENDOR    Cisco
-# Cisco ASA / ASAv — 租户入口标识（Route B SPEC-01）
+BEGIN-VENDOR    Cisco-ASA
 ATTRIBUTE       TunnelGroupName   146     string
-# 备选 AVPair 形式（vendor-type 1）— 发送 "tunnel-group=..." 时使用
-ATTRIBUTE       Cisco-AVPair        1     string
-END-VENDOR      Cisco
+END-VENDOR      Cisco-ASA

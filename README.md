@@ -7,18 +7,35 @@
 ## 功能
 
 - **URL 选组** — 等价 ASAv `group-url`，通过 `select-group-by-url` 实现
-- **RADIUS 认证** — radcli + FreeRADIUS，策略由 Access-Accept 下发
+- **RADIUS 认证** — radcli + FreeRADIUS；Access-Request / Accounting 均携带 `TunnelGroupName`
+- **OpenConnect 兼容** — 支持 XML 两阶段认证（`/auth` 密码阶段仍传组名）
 - **热加组** — 写入 `config-per-group/{access_key}` 后 SIGHUP，无需 restart
 - **POP API（P2 侧车）** — Go HTTP API，供平台 Worker 下发配置
 - **门禁 POC G1–G6** — `gate-poc/` 自动化验收脚本
-- **Fork 补丁** — RADIUS 发送 TunnelGroupName VSA 146（SPEC-01，P1）
+- **SPEC-01 补丁** — `scripts/apply-spec01-edits.py`（ocserv 1.4.2，**已在 157.15.107.12 端到端验证**）
+
+## 生产验证（2026-06-26）
+
+| 项 | POP 157.15.107.12 | 控制面 157.15.107.244 |
+|----|-------------------|----------------------|
+| Route B 认证 | OpenConnect + curl → RADIUS Accept | FreeRADIUS → REST API |
+| 完整隧道 | WSL `openconnect` → CSTP + `10.250.0.x` | Accounting-Start 含 TunnelGroupName |
+| 配置 | `ocserv.conf` 由 qosnatd 管理，补丁仅替换二进制 | — |
 
 ## 快速开始（Ubuntu 24.04 POP）
+
+**全新安装：**
 
 ```bash
 git clone https://github.com/hk59775634/ocserv-tunnel.git
 cd ocserv-tunnel
 sudo bash scripts/prod-ocserv-install.sh
+```
+
+**已有节点（仅更新 ocserv 二进制，不改 `ocserv.conf`）：**
+
+```bash
+sudo bash scripts/reinstall-patched-ocserv.sh
 ```
 
 编译并部署 pop-api 侧车：
@@ -29,6 +46,21 @@ sudo install -m 0755 ocserv-pop-api /usr/local/bin/
 sudo cp deploy/systemd/ocserv-pop-api.service /etc/systemd/system/
 # 在 /etc/ocserv/pop-api.env 中设置 OCSERV_API_KEY
 sudo systemctl enable --now ocserv-pop-api
+```
+
+客户端连接示例：
+
+```bash
+openconnect https://POP:10000/demo_agent \
+  -u testuser --authgroup=demo_agent \
+  --servercert=pin-sha256:YOUR_PIN --no-dtls
+```
+
+冒烟测试：
+
+```bash
+bash scripts/test-route-b-auth.sh 127.0.0.1 10000 demo_agent testuser 'User@123'
+bash scripts/test-openconnect-routeb.sh
 ```
 
 运行门禁测试：
@@ -43,12 +75,22 @@ bash gate-poc/scripts/run-all.sh
 ```
 ocserv-tunnel/
 ├── configs/           # ocserv.d 片段 + radcli 字典
-├── patches/           # ocserv Fork 补丁（TunnelGroupName）
+├── patches/           # SPEC-01 参考补丁与 ipc.proto.ref
 ├── pop-api/           # P2 侧车 REST API
 ├── deploy/systemd/    # systemd 单元文件
-├── scripts/           # 编译与生产安装脚本
+├── scripts/           # apply-spec01-edits.py、编译、安装、冒烟测试
 └── gate-poc/          # G1–G6 门禁 POC
 ```
+
+### 关键脚本
+
+| 脚本 | 用途 |
+|------|------|
+| `scripts/apply-spec01-edits.py` | 对 ocserv 1.4.2 源码打 SPEC-01 补丁 |
+| `scripts/reinstall-patched-ocserv.sh` | POP 上仅替换二进制并重载服务 |
+| `scripts/fix-radcli-dict.sh` | 主 radcli 字典注册 TunnelGroupName VSA |
+| `scripts/test-route-b-auth.sh` | curl Route B 认证冒烟 |
+| `scripts/test-openconnect-routeb.sh` | OpenConnect XML 两阶段冒烟 |
 
 ## POP API（P2 侧车）
 
@@ -69,7 +111,7 @@ ocserv-tunnel/
 ## ocserv 版本
 
 - Ubuntu apt 自带 **1.2.4**（不支持 `select-group-by-url`）
-- 安装脚本会在需要时从源码编译 **1.4.2**
+- 安装脚本会在需要时从源码编译 **1.4.2** 并应用 SPEC-01
 - 基线标签：`1.4.2`
 
 ## 许可证

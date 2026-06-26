@@ -1,40 +1,55 @@
 # ocserv-tunnel 补丁
 
-在检出冻结标签后的上游 ocserv **1.2.x / 1.4.x** 源码上应用。
+**基线：** ocserv **1.4.2**（已在 157.15.107.12 生产验证）。`0001-*.patch` 仅供参考；**推荐**使用 `scripts/apply-spec01-edits.py`。
 
 ```bash
+git clone --depth 1 --branch 1.4.2 https://gitlab.com/openconnect/ocserv.git ocserv-src
 cd ocserv-src
-for p in patches/*.patch; do patch -p1 -N < "$p" || echo "补丁需手动处理: $p"; done
+python3 ../scripts/apply-spec01-edits.py .
+meson setup build --prefix=/usr/local && ninja -C build
+```
+
+已有 POP 节点仅替换二进制（不改动 `ocserv.conf`）：
+
+```bash
+sudo bash scripts/reinstall-patched-ocserv.sh
 ```
 
 ## 索引
 
-| 补丁 | SPEC | 说明 |
+| 产物 | SPEC | 说明 |
 |------|------|------|
-| `0001-radius-send-tunnel-group-name.patch` | SPEC-01 | 在 RADIUS Access-Request 中发送 Cisco `TunnelGroupName`（VSA 146） |
+| `scripts/apply-spec01-edits.py` | SPEC-01 | **主实现**：认证 + 计费 RADIUS 发送 `TunnelGroupName`（VSA 146） |
+| `0001-radius-send-tunnel-group-name.patch` | SPEC-01 | 早期 diff（1.4.2 上可能无法直接 `patch -p1`） |
+| `radius_tunnel_group.c.snippet` | SPEC-01 | 手工集成参考 |
+| `ipc.proto.ref` | SPEC-01 | `sec_auth_cont_msg.group_name` 字段参考 |
 
-后续补丁（脚手架中尚未包含）：
+## SPEC-01 改动摘要（2026-06-26 已验证）
+
+| 区域 | 改动 |
+|------|------|
+| `worker-auth.c` | URL / `group-select` / `<group-access>` 解析；`auth_cont` 携带 `group_name` |
+| `sec-mod-auth.c` | `req_group_name` 持久化；`radius_auth_bind_group` 于 `auth_pass` 前 |
+| `auth/radius.c` | Access-Request 发送 VSA 146；Route B 组名校验 |
+| `acct/radius.c` | Accounting-Start 发送 `TunnelGroupName`（完整隧道必需） |
+| `ipc.proto` | `sec_auth_cont_msg` 增加 `group_name` |
+| radcli | `dictionary.vpnplatform` + 主字典 Cisco-ASA 段 `TunnelGroupName` 146 |
+
+## 验收
+
+```bash
+# curl 冒烟
+bash scripts/test-route-b-auth.sh 127.0.0.1 10000 demo_agent testuser 'User@123'
+
+# OpenConnect XML 两阶段
+bash scripts/test-openconnect-routeb.sh
+
+# 客户端（WSL / Linux）
+openconnect https://POP:PORT/demo_agent -u USER --authgroup=demo_agent \
+  --servercert=pin-sha256:... --no-dtls
+```
+
+后续补丁（尚未包含）：
 
 - SPEC-02 — 内嵌 POP 管理 API（P1）
-- SPEC-04 — SIGHUP 时重扫 `auto-select-group` 目录（若 POC 未通过）
-
-## SPEC-01 集成说明
-
-**目标：** 客户端连接 `https://pop/{access_key}` 时，ocserv 通过 `select-group-by-url` 选定 authgroup。该组名必须出现在 RADIUS Access-Request 的 Cisco VSA 146（`TunnelGroupName`）中。
-
-**上游调用顺序（sec-mod）：**
-
-1. Worker 发送 auth init，`group_name` 写入 `e->req_group_name`（`sec-mod-auth.c`）。
-2. `set_auth_group()` 调用 `module->auth_group()`，填充 `e->acct_info.groupname`。
-3. `module->auth_pass()` 在组名确定**之后**执行。
-
-**缺口：** `radius_auth_init()` 仅接收 `common_auth_init_st`（无 group 字段）；`radius_ctx_st` 目前没有 selected-group 存储。
-
-**实现者待办：**
-
-1. 扩展 `common_auth_init_st` 增加 `const char *groupname`，**或** 在 `auth_pass` 前由 sec-mod 调用 `radius_auth_set_group()`。
-2. 将 URL 选定的组写入 `pctx->selected_group`（补丁在 `radius_ctx_st` 中增加字段）。
-3. 确保 radcli 在 `rc_read_dictionary` 前加载 `dictionary.vpnplatform`。
-4. 用 `radclient` / FreeRADIUS debug 验证 VSA 146 等于 `access_key`。
-
-若统一 diff 无法干净应用于你的 ocserv 标签，请参考 `radius_tunnel_group.c.snippet`。
+- SPEC-04 — SIGHUP 时重扫 `auto-select-group` 目录
